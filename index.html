@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dhaka Div Search</title>
+<title>মৌজা ম্যাপ আর্কাইভ সার্চ · Mouza Map Archive Search</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -215,6 +215,66 @@
   .loading .dot:nth-child(3){animation-delay:.3s;}
   @keyframes pulse{0%,80%,100%{opacity:.25;}40%{opacity:1;}}
 
+  .regex-help{
+    display:none;
+    margin-top:10px;
+    padding:12px 14px;
+    background:var(--amber-bg);
+    border:1px solid #E9D3A0;
+    border-radius:8px;
+    font-size:12.5px;
+    color:var(--teal-deep);
+  }
+  .regex-help.show{display:block;}
+  .regex-help .rh-title{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--amber);
+    font-weight:600;
+    margin-bottom:8px;
+  }
+  .regex-help .rh-list{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .regex-help .rh-item{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .regex-help code{
+    font-family:'IBM Plex Mono',monospace;
+    background:#FFFFFF;
+    border:1px solid #E9D3A0;
+    border-radius:5px;
+    padding:2px 7px;
+    font-size:12px;
+    color:var(--teal-deep);
+    cursor:pointer;
+    transition:background .15s, border-color .15s;
+  }
+  .regex-help code:hover{
+    background:var(--teal);
+    color:#fff;
+    border-color:var(--teal);
+  }
+  .regex-help .rh-desc{
+    color:var(--ink-soft);
+    font-family:'IBM Plex Sans',sans-serif;
+  }
+  .regex-help .rh-note{
+    margin-top:8px;
+    padding-top:8px;
+    border-top:1px solid #E9D3A0;
+    color:var(--ink-soft);
+    font-size:11.5px;
+  }
+  .regex-help .rh-note a{color:var(--teal-deep);}
+
   .more-note{
     text-align:center;
     font-size:12px;
@@ -241,9 +301,9 @@
 <body>
 
 <header>
-  <div class="eyebrow">MapS Index</div>
+  <div class="eyebrow">Map Index</div>
   <h1 class="bn">মৌজা ম্যাপ সার্চ
-    <span class="en">Instant search across every scanned mouza / thana map file</span>
+    <span class="en">Instant search across map files</span>
   </h1>
   <div class="legend" id="legend">লোড হচ্ছে…</div>
 </header>
@@ -260,12 +320,23 @@
       <span id="statusText">ডেটা লোড হচ্ছে…</span>
       <span id="fuzzyFlag"></span>
     </div>
+    <div class="regex-help" id="regexHelp">
+      <div class="rh-title">উদাহরণ প্যাটার্ন — · Click any example to try it</div>
+      <div class="rh-list">
+        <div class="rh-item"><code data-pattern="^13-RS-">^13-RS-</code><span class="rh-desc bn">যা "13-RS-" দিয়ে শুরু · starts with "13-RS-"</span></div>
+        <div class="rh-item"><code data-pattern="পাড়া$">পাড়া$</code><span class="rh-desc bn">যা "পাড়া" দিয়ে শেষ · ends with "পাড়া"</span></div>
+        <div class="rh-item"><code data-pattern="Thana-(Faridpur|Rajbari)">Thana-(Faridpur|Rajbari)</code><span class="rh-desc bn">এই দুটোর যেকোনো একটি · matches either name</span></div>
+        <div class="rh-item"><code data-pattern="\d{2}-\d{2}">\d{2}-\d{2}</code><span class="rh-desc bn">দুই-অঙ্কের সংখ্যা জোড়া · two-digit number pairs</span></div>
+        <div class="rh-item"><code data-pattern="\.pdf$">\.pdf$</code><span class="rh-desc bn">শুধু .pdf ফাইল · files ending in .pdf</span></div>
+      </div>
+      <div class="rh-note">রেজেক্স নিজে শিখতে/টেস্ট করতে দেখুন: <a href="https://regex101.com" target="_blank" rel="noopener">regex101.com</a> (Flavor: JavaScript নির্বাচন করুন)</div>
+    </div>
   </div>
 
   <div id="results"></div>
 </main>
 
-<footer>data.gSon</footer>
+<footer>data.jSon</footer>
 
 <script>
 const MAX_RENDER = 300;
@@ -280,6 +351,7 @@ const resultsEl = document.getElementById('results');
 const statusText = document.getElementById('statusText');
 const fuzzyFlag = document.getElementById('fuzzyFlag');
 const legend = document.getElementById('legend');
+const regexHelp = document.getElementById('regexHelp');
 
 function escapeHtml(s){
   return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -397,7 +469,18 @@ qInput.addEventListener('input', () => {
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(runSearch, DEBOUNCE_MS);
 });
-regexToggle.addEventListener('change', runSearch);
+regexToggle.addEventListener('change', () => {
+  regexHelp.classList.toggle('show', regexToggle.checked);
+  runSearch();
+});
+
+regexHelp.addEventListener('click', (e) => {
+  const code = e.target.closest('code[data-pattern]');
+  if(!code) return;
+  qInput.value = code.dataset.pattern;
+  qInput.focus();
+  runSearch();
+});
 
 async function init(){
   try{
