@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dhaka Div Search</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/7.0.0/fuse.min.js"></script>
+<style>
+  :root{
+    --paper:#F7F5EF;
+    --paper-line:#E4DFD1;
+    --ink:#1E2A2E;
+    --ink-soft:#5B6B66;
+    --teal:#28655A;
+    --teal-deep:#1B463D;
+    --amber:#B9862F;
+    --amber-bg:#FBEFD6;
+    --slate:#51667A;
+    --card:#FFFFFF;
+    --danger:#A3423A;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'IBM Plex Sans','Noto Sans Bengali',sans-serif;
+    min-height:100vh;
+    background-image:
+      linear-gradient(var(--paper-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--paper-line) 1px, transparent 1px);
+    background-size:28px 28px;
+    background-position:-1px -1px;
+  }
+  .bn{font-family:'Noto Sans Bengali','IBM Plex Sans',sans-serif;}
+
+  header{
+    padding:40px 20px 28px;
+    text-align:center;
+    border-bottom:1px solid var(--paper-line);
+    background:linear-gradient(180deg, rgba(247,245,239,0.4), var(--paper) 70%);
+  }
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--teal);
+    margin-bottom:10px;
+  }
+  h1{
+    font-size:clamp(22px,4vw,32px);
+    margin:0 0 6px;
+    font-weight:700;
+    letter-spacing:-0.01em;
+  }
+  h1 .en{
+    display:block;
+    font-family:'IBM Plex Sans',sans-serif;
+    font-style:italic;
+    font-weight:400;
+    font-size:0.5em;
+    color:var(--ink-soft);
+    margin-top:4px;
+  }
+  .legend{
+    display:inline-flex;
+    gap:18px;
+    margin-top:14px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    color:var(--ink-soft);
+    border:1px solid var(--paper-line);
+    background:var(--card);
+    padding:8px 16px;
+    border-radius:999px;
+  }
+  .legend b{color:var(--teal-deep);}
+
+  main{
+    max-width:840px;
+    margin:0 auto;
+    padding:28px 20px 80px;
+  }
+
+  .search-shell{
+    background:var(--card);
+    border:1px solid var(--paper-line);
+    border-radius:var(--radius);
+    padding:14px;
+    box-shadow:0 1px 2px rgba(30,42,46,0.04);
+  }
+  .search-row{
+    display:flex;
+    gap:10px;
+    align-items:center;
+  }
+  .search-row input[type=text]{
+    flex:1;
+    border:1px solid var(--paper-line);
+    border-radius:8px;
+    padding:12px 14px;
+    font-size:16px;
+    font-family:inherit;
+    color:var(--ink);
+    background:var(--paper);
+    outline:none;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  .search-row input[type=text]:focus{
+    border-color:var(--teal);
+    box-shadow:0 0 0 3px rgba(40,101,90,0.15);
+    background:var(--card);
+  }
+  .regex-toggle{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    color:var(--ink-soft);
+    white-space:nowrap;
+    cursor:pointer;
+    user-select:none;
+    padding:6px 10px;
+    border-radius:8px;
+    border:1px solid var(--paper-line);
+  }
+  .regex-toggle input{accent-color:var(--teal);}
+  .status-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:10px;
+    padding:0 2px;
+    font-size:12.5px;
+    color:var(--ink-soft);
+    min-height:18px;
+  }
+  .status-row .fuzzy-flag{
+    color:var(--amber);
+    font-weight:600;
+  }
+  .status-row .regex-error{color:var(--danger);font-weight:600;}
+
+  #results{
+    margin-top:16px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .row{
+    background:var(--card);
+    border:1px solid var(--paper-line);
+    border-radius:8px;
+    padding:11px 14px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+  }
+  .row .meta{min-width:0;}
+  .row .folder{
+    font-size:11.5px;
+    color:var(--slate);
+    font-family:'IBM Plex Mono',monospace;
+    margin-bottom:3px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .row .filename{
+    font-size:14.5px;
+    font-weight:500;
+    overflow-wrap:anywhere;
+  }
+  .row mark{
+    background:var(--amber-bg);
+    color:var(--teal-deep);
+    border-radius:3px;
+    padding:0 1px;
+  }
+  .copy-btn{
+    flex-shrink:0;
+    border:1px solid var(--paper-line);
+    background:var(--paper);
+    color:var(--ink-soft);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    padding:6px 10px;
+    border-radius:6px;
+    cursor:pointer;
+    transition:background .15s,color .15s;
+  }
+  .copy-btn:hover{background:var(--teal);color:#fff;border-color:var(--teal);}
+  .copy-btn.copied{background:var(--teal-deep);color:#fff;border-color:var(--teal-deep);}
+
+  .empty, .hint, .loading{
+    text-align:center;
+    color:var(--ink-soft);
+    padding:48px 16px;
+    font-size:14px;
+  }
+  .empty b{color:var(--ink);}
+  .loading .dot{
+    display:inline-block;width:6px;height:6px;border-radius:50%;
+    background:var(--teal);margin:0 2px;
+    animation:pulse 1s infinite ease-in-out;
+  }
+  .loading .dot:nth-child(2){animation-delay:.15s;}
+  .loading .dot:nth-child(3){animation-delay:.3s;}
+  @keyframes pulse{0%,80%,100%{opacity:.25;}40%{opacity:1;}}
+
+  .more-note{
+    text-align:center;
+    font-size:12px;
+    color:var(--ink-soft);
+    padding:14px 0 4px;
+    font-family:'IBM Plex Mono',monospace;
+  }
+
+  footer{
+    text-align:center;
+    font-size:11.5px;
+    color:var(--ink-soft);
+    padding:20px;
+    font-family:'IBM Plex Mono',monospace;
+  }
+
+  @media (max-width:520px){
+    .legend{flex-wrap:wrap;justify-content:center;gap:8px 14px;}
+    .search-row{flex-wrap:wrap;}
+    .regex-toggle{order:2;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">National Digital Land Zoning Project · Mouza Map Index</div>
+  <h1 class="bn">মৌজা ম্যাপ আর্কাইভ সার্চ
+    <span class="en">Instant search across every scanned mouza / thana map file</span>
+  </h1>
+  <div class="legend" id="legend">লোড হচ্ছে…</div>
+</header>
+
+<main>
+  <div class="search-shell">
+    <div class="search-row">
+      <input type="text" id="q" placeholder="ফোল্ডার বা ফাইলের নাম লিখুন — যেকোনো অংশ, বাংলা বা ইংরেজি…" autocomplete="off" spellcheck="false" disabled>
+      <label class="regex-toggle">
+        <input type="checkbox" id="regexToggle"> Regex
+      </label>
+    </div>
+    <div class="status-row">
+      <span id="statusText">ডেটা লোড হচ্ছে…</span>
+      <span id="fuzzyFlag"></span>
+    </div>
+  </div>
+
+  <div id="results"></div>
+</main>
+
+<footer>data.json · generated from FolderPath / FileName columns · রিজেনারেট করতে convert.py দেখুন</footer>
+
+<script>
+const MAX_RENDER = 300;
+const DEBOUNCE_MS = 120;
+
+let ITEMS = [];         // {p, f, c} c = lowercased combined text
+let fuseIndex = null;   // lazy Fuse.js instance for fuzzy fallback
+
+const qInput = document.getElementById('q');
+const regexToggle = document.getElementById('regexToggle');
+const resultsEl = document.getElementById('results');
+const statusText = document.getElementById('statusText');
+const fuzzyFlag = document.getElementById('fuzzyFlag');
+const legend = document.getElementById('legend');
+
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function highlight(text, terms){
+  if(!terms.length) return escapeHtml(text);
+  let escaped = escapeHtml(text);
+  for(const t of terms){
+    if(!t) continue;
+    const safe = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    escaped = escaped.replace(new RegExp('('+safe+')', 'gi'), '<mark>$1</mark>');
+  }
+  return escaped;
+}
+
+function renderEmpty(msg){
+  resultsEl.innerHTML = `<div class="empty">${msg}</div>`;
+}
+
+function renderRows(matches, terms){
+  if(matches.length === 0){
+    renderEmpty('কোনো ফলাফল পাওয়া যায়নি। বানান পাল্টে বা ছোট অংশ লিখে দেখুন।<br><span style="font-size:12px">No results — try a shorter fragment or check spelling.</span>');
+    return;
+  }
+  const shown = matches.slice(0, MAX_RENDER);
+  let html = '';
+  for(const it of shown){
+    const folderHtml = highlight(it.p, terms);
+    const fileHtml = highlight(it.f, terms);
+    const fullPath = it.p + ' / ' + it.f;
+    html += `<div class="row">
+      <div class="meta">
+        <div class="folder bn">${folderHtml}</div>
+        <div class="filename bn">${fileHtml}</div>
+      </div>
+      <button class="copy-btn" data-path="${escapeHtml(fullPath)}">Copy</button>
+    </div>`;
+  }
+  resultsEl.innerHTML = html;
+  if(matches.length > MAX_RENDER){
+    resultsEl.insertAdjacentHTML('beforeend',
+      `<div class="more-note">${matches.length.toLocaleString()} ফলাফলের মধ্যে প্রথম ${MAX_RENDER}টি দেখানো হচ্ছে — আরও নির্দিষ্ট করে লিখুন</div>`);
+  }
+}
+
+resultsEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('.copy-btn');
+  if(!btn) return;
+  navigator.clipboard.writeText(btn.dataset.path).then(() => {
+    btn.textContent = 'Copied';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1200);
+  });
+});
+
+function getFuse(){
+  if(!fuseIndex){
+    fuseIndex = new Fuse(ITEMS, {
+      keys: ['c'],
+      threshold: 0.38,
+      ignoreLocation: true,
+      minMatchCharLength: 2
+    });
+  }
+  return fuseIndex;
+}
+
+function runSearch(){
+  const raw = qInput.value.trim();
+  fuzzyFlag.textContent = '';
+  fuzzyFlag.className = '';
+
+  if(!raw){
+    statusText.textContent = `মোট ${ITEMS.length.toLocaleString()}টি ফাইল — খোঁজ শুরু করতে টাইপ করুন`;
+    renderEmpty('উপরে টাইপ করা শুরু করুন। ফলাফল সঙ্গে সঙ্গে দেখা যাবে।<br><span style="font-size:12px">Start typing above — results appear instantly.</span>');
+    return;
+  }
+
+  if(regexToggle.checked){
+    let re;
+    try{
+      re = new RegExp(raw, 'i');
+    }catch(err){
+      statusText.innerHTML = `<span class="regex-error">Invalid regex: ${escapeHtml(err.message)}</span>`;
+      renderEmpty('রেজেক্স প্যাটার্নটি সঠিক নয়।');
+      return;
+    }
+    const matches = ITEMS.filter(it => re.test(it.c));
+    statusText.textContent = `${matches.length.toLocaleString()}টি ফলাফল (regex)`;
+    renderRows(matches, []);
+    return;
+  }
+
+  const terms = raw.toLowerCase().split(/\s+/).filter(Boolean);
+  let matches = ITEMS.filter(it => terms.every(t => it.c.includes(t)));
+  let fuzzy = false;
+
+  if(matches.length === 0 && raw.length >= 2){
+    fuzzy = true;
+    const fuse = getFuse();
+    matches = fuse.search(raw, { limit: 500 }).map(r => r.item);
+  }
+
+  statusText.textContent = `${matches.length.toLocaleString()}টি ফলাফল`;
+  if(fuzzy && matches.length){
+    fuzzyFlag.textContent = 'কাছাকাছি মিল (fuzzy match)';
+    fuzzyFlag.className = 'fuzzy-flag';
+  }
+  renderRows(matches, fuzzy ? [] : terms);
+}
+
+let debounceTimer = null;
+qInput.addEventListener('input', () => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(runSearch, DEBOUNCE_MS);
+});
+regexToggle.addEventListener('change', runSearch);
+
+async function init(){
+  try{
+    const res = await fetch('./data.json');
+    const raw = await res.json();
+    const folders = raw.folders;
+    ITEMS = raw.files.map(([fi, f]) => {
+      const p = folders[fi];
+      return { p, f, c: (p + ' ' + f).toLowerCase() };
+    });
+    legend.innerHTML = `<span><b>${ITEMS.length.toLocaleString()}</b> files</span><span><b>${folders.length.toLocaleString()}</b> folders</span>`;
+    qInput.disabled = false;
+    qInput.focus();
+    runSearch();
+  }catch(err){
+    statusText.textContent = 'data.json লোড করা যায়নি — কনসোল দেখুন।';
+    console.error(err);
+  }
+}
+init();
+</script>
+</body>
+</html>
